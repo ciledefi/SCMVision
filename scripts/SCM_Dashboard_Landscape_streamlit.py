@@ -5,36 +5,41 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import json
 import os
-from SCM_PnL_Output_JSON_full_refactored_streamlit import generate_pnl_data  # Importiere die PnL-Funktion
+from SCM_PnL_Output_JSON_full_refactored_streamlit import generate_pnl_data, get_root_output_dir  # Importiere die PnL-Funktion
+
+
+# Globale Variable für den Output-Ordner
+output_dir = get_root_output_dir()
+
+def load_json(filename):
+    """
+    Lädt eine JSON-Datei aus dem 'output'-Verzeichnis im Root.
+    """
+    filepath = os.path.join(output_dir, filename)
+
+    try:
+        with open(filepath, "r") as f:
+            st.info(f"Lade Datei: {filepath}")  # Debugging
+            return json.load(f)
+    except FileNotFoundError:
+        st.error(f"Datei nicht gefunden: {filepath}")
+        return {}
 
 # Layout für Streamlit Dashboard
 st.set_page_config(layout="wide")
 st.markdown("<h1 style='text-align: center;'>SCM Performance Dashboard</h1>", unsafe_allow_html=True)
-
-
-# Funktion zum Laden von JSON-Daten
-def load_json(filepath):
-    try:
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        st.error(f"Die Datei {filepath} wurde nicht gefunden. Bitte generieren Sie die PnL-Daten.")
-        return {}
 
 # JSON-Daten generieren (Button)
 if st.sidebar.button("PnL-Daten generieren"):
     st.info("PnL-Daten werden generiert...")
     print("Generierungs-Button wurde geklickt")  # Debug-Ausgabe
     generate_pnl_data()
-    generate_pnl_data()
     st.success("PnL-Daten erfolgreich generiert!")
-
-    
+    st.write(f"Dateien wurden im Output-Ordner ({output_dir}) gespeichert.")
 
 # JSON-Dateien laden
-output_dir = "./output"
-kucoin_data = load_json("output/kucoin_pnl.json")
-bitget_data = load_json("output/bitget_pnl.json")
+kucoin_data = load_json("kucoin_pnl.json")
+bitget_data = load_json("bitget_pnl.json")
 
 # Prüfen, ob Daten vorhanden sind
 if kucoin_data and bitget_data:
@@ -66,7 +71,7 @@ if kucoin_data and bitget_data:
     }
     df = pd.DataFrame(data)
 
-    # Funktion zum Erstellen von Gauges mit Pfeilen
+    # Funktion zum Erstellen von Gauges
     def create_gauge(value, min_val, max_val, threshold_1, threshold_2):
         gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
@@ -90,7 +95,6 @@ if kucoin_data and bitget_data:
         ))
         return gauge
 
-    
     # Aktuelle PnL Werte Tabelle
     st.subheader("Aktuelle PnL Werte:")
     st.dataframe(df, use_container_width=True)
