@@ -1,0 +1,27 @@
+# Sensible Umgebungsvariablen
+.env
+
+# Byte-compiled Python-Dateien
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtuelle Umgebungen
+venv/
+env/
+
+# Log-Dateien
+*.log
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# IDE-spezifische Dateien
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Betriebssystem-spezifische Dateien
+.DS_Store
+Thumbs.db
