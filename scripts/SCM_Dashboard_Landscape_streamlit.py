@@ -24,12 +24,17 @@ def load_json(filepath):
 # JSON-Daten generieren (Button)
 if st.sidebar.button("PnL-Daten generieren"):
     st.info("PnL-Daten werden generiert...")
+    print("Generierungs-Button wurde geklickt")  # Debug-Ausgabe
+    generate_pnl_data()
     generate_pnl_data()
     st.success("PnL-Daten erfolgreich generiert!")
 
+    
+
 # JSON-Dateien laden
-kucoin_data = load_json("./kucoin_pnl.json")
-bitget_data = load_json("./bitget_pnl.json")
+output_dir = "./output"
+kucoin_data = load_json("output/kucoin_pnl.json")
+bitget_data = load_json("output/bitget_pnl.json")
 
 # Prüfen, ob Daten vorhanden sind
 if kucoin_data and bitget_data:

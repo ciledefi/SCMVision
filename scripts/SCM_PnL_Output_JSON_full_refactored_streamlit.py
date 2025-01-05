@@ -69,12 +69,11 @@ def save_pnl_to_json(exchange, investment, spot_balance, futures_balance, filena
         "pnl_percentage": pnl_percentage
     }
 
-    # Speicherpfad für den Output-Ordner
-    output_dir = os.getenv("OUTPUT_DIR", "./output")
-
-    # Ordner erstellen, falls er nicht existiert
-    os.makedirs(output_dir, exist_ok=True)
-
+    # Basisverzeichnis und Output-Verzeichnis festlegen
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # Projektverzeichnis
+    output_dir = os.getenv("OUTPUT_DIR", os.path.join(base_dir, "output"))
+    os.makedirs(output_dir, exist_ok=True)  # Output-Verzeichnis erstellen, falls es nicht existiert 
+       
     # Vollständiger Pfad der Datei
     filepath = f"{output_dir}/{filename}"
 
