@@ -1,5 +1,6 @@
 streamlit
 plotly
 pandas
+matplotlib
 numpy
 python-dotenv
