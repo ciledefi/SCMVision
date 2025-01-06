@@ -5,43 +5,76 @@ import base64
 import time
 import json
 import os
-import streamlit as st
 from dotenv import load_dotenv
+try:
+    import streamlit as st  # Streamlit wird nur verwendet, wenn verfügbar
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
 
-# API-Konfigurationen
-# api_key_bitget = os.getenv("API_KEY_BITGET")
-# api_secret_bitget = os.getenv("API_SECRET_BITGET")
-# api_passphrase_bitget = os.getenv("API_PASSPHRASE_BITGET")
+# Überprüfen, ob wir lokal oder in der Cloud arbeiten
+LOCAL_MODE = os.getenv("LOCAL_MODE", "true").lower() == "true"
 
-# api_key_kucoin = os.getenv("API_KEY_KUCOIN")
-# api_secret_kucoin = os.getenv("API_SECRET_KUCOIN")
-# api_passphrase_kucoin = os.getenv("API_PASSPHRASE_KUCOIN")
+# Funktion zur API-Key-Abfrage
+def get_api_key(service, key_type):
+    """
+    Ruft den API-Key basierend auf dem Modus (lokal oder Cloud) ab.
 
+    :param service: Der Service-Name (z. B. "KUCOIN" oder "BITGET").
+    :param key_type: Der Typ des API-Schlüssels (z. B. "KEY", "SECRET", "PASSPHRASE").
+    :return: Der API-Schlüssel (als String).
+    """
+    key_name = f"API_{key_type}_{service}".upper()
+    if LOCAL_MODE:
+        # Lokale Umgebung: Nutze .env-Variable
+        return os.getenv(key_name)
+    elif STREAMLIT_AVAILABLE:
+        # Streamlit-Umgebung: Nutze st.secrets
+        try:
+            return st.secrets[key_name]
+        except KeyError:
+            raise KeyError(f"{key_name} fehlt in den Streamlit-Secrets.")
+    else:
+        raise EnvironmentError("Neither LOCAL_MODE nor Streamlit secrets are available.")
 
-# Laden der Secrets
-api_key_kucoin = st.secrets["API_KEY_KUCOIN"]
-api_secret_kucoin = st.secrets["API_SECRET_KUCOIN"]
-api_passphrase_kucoin = st.secrets["API_PASSPHRASE_KUCOIN"]
+# Abfrage und Validierung der API-Keys für KuCoin und Bitget
+def validate_and_fetch_keys():
+    services = ["KUCOIN", "BITGET"]
+    key_types = ["KEY", "SECRET", "PASSPHRASE"]
+    keys = {}
 
-api_key_bitget = st.secrets["API_KEY_BITGET"]
-api_secret_bitget = st.secrets["API_SECRET_BITGET"]
-api_passphrase_bitget = st.secrets["API_PASSPHRASE_BITGET"]
+    for service in services:
+        for key_type in key_types:
+            key = get_api_key(service, key_type)
+            if not key:
+                raise ValueError(f"Fehlender API-Key: {key_type} für {service}. Überprüfen Sie Ihre Konfiguration.")
+            keys[f"{service}_{key_type}"] = key
 
-print("API_KEY_KUCOIN:", api_key_kucoin)
-print("API_SECRET_KUCOIN:", api_secret_kucoin)
-print("API_PASSPHRASE_KUCOIN:", api_passphrase_kucoin)
-print("API_KEY_BITGET:", api_key_bitget)
-print("API_SECRET_BITGET:", api_secret_bitget)
-print("API_PASSPHRASE_BITGET:", api_passphrase_bitget)
+    return keys
 
+# API-Keys abrufen
+api_keys = validate_and_fetch_keys()
 
-if not all([api_key_kucoin, api_secret_kucoin, api_passphrase_kucoin]):
-    raise ValueError("KuCoin API-Umgebungsvariablen fehlen. Bitte überprüfen Sie Ihre .env-Datei oder Streamlit-Umgebung.")
-if not all([api_key_bitget, api_secret_bitget, api_passphrase_bitget]):
-    raise ValueError("Bitget API-Umgebungsvariablen fehlen. Bitte überprüfen Sie Ihre .env-Datei oder Streamlit-Umgebung.")
+# Debugging-Ausgabe (optional)
+if LOCAL_MODE:
+    print("Lokalmodus aktiv: Umgebungsvariablen verwendet.")
+else:
+    print("Cloud-Modus aktiv: Secrets verwendet.")
+
+for key, value in api_keys.items():
+    print(f"{key}: {value}")
+
+# Zugriff auf die API-Keys
+api_key_kucoin = api_keys["KUCOIN_KEY"]
+api_secret_kucoin = api_keys["KUCOIN_SECRET"]
+api_passphrase_kucoin = api_keys["KUCOIN_PASSPHRASE"]
+
+api_key_bitget = api_keys["BITGET_KEY"]
+api_secret_bitget = api_keys["BITGET_SECRET"]
+api_passphrase_bitget = api_keys["BITGET_PASSPHRASE"]
 
 
 def get_root_output_dir():
