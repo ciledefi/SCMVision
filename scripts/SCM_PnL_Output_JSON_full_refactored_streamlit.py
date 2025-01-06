@@ -27,6 +27,13 @@ print("API_KEY_BITGET:", api_key_bitget)
 print("API_SECRET_BITGET:", api_secret_bitget)
 print("API_PASSPHRASE_BITGET:", api_passphrase_bitget)
 
+
+if not all([api_key_kucoin, api_secret_kucoin, api_passphrase_kucoin]):
+    raise ValueError("KuCoin API-Umgebungsvariablen fehlen. Bitte überprüfen Sie Ihre .env-Datei oder Streamlit-Umgebung.")
+if not all([api_key_bitget, api_secret_bitget, api_passphrase_bitget]):
+    raise ValueError("Bitget API-Umgebungsvariablen fehlen. Bitte überprüfen Sie Ihre .env-Datei oder Streamlit-Umgebung.")
+
+
 def get_root_output_dir():
     """
     Gibt den absoluten Pfad zum 'output'-Verzeichnis im Root zurück.
