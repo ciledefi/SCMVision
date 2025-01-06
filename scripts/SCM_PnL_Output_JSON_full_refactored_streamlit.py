@@ -5,20 +5,30 @@ import base64
 import time
 import json
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
 # API-Konfigurationen
-api_key_bitget = os.getenv("API_KEY_BITGET")
-api_secret_bitget = os.getenv("API_SECRET_BITGET")
-api_passphrase_bitget = os.getenv("API_PASSPHRASE_BITGET")
+# api_key_bitget = os.getenv("API_KEY_BITGET")
+# api_secret_bitget = os.getenv("API_SECRET_BITGET")
+# api_passphrase_bitget = os.getenv("API_PASSPHRASE_BITGET")
 
-api_key_kucoin = os.getenv("API_KEY_KUCOIN")
-api_secret_kucoin = os.getenv("API_SECRET_KUCOIN")
-api_passphrase_kucoin = os.getenv("API_PASSPHRASE_KUCOIN")
+# api_key_kucoin = os.getenv("API_KEY_KUCOIN")
+# api_secret_kucoin = os.getenv("API_SECRET_KUCOIN")
+# api_passphrase_kucoin = os.getenv("API_PASSPHRASE_KUCOIN")
 
+
+# Laden der Secrets
+api_key_kucoin = st.secrets["API_KEY_KUCOIN"]
+api_secret_kucoin = st.secrets["API_SECRET_KUCOIN"]
+api_passphrase_kucoin = st.secrets["API_PASSPHRASE_KUCOIN"]
+
+api_key_bitget = st.secrets["API_KEY_BITGET"]
+api_secret_bitget = st.secrets["API_SECRET_BITGET"]
+api_passphrase_bitget = st.secrets["API_PASSPHRASE_BITGET"]
 
 print("API_KEY_KUCOIN:", api_key_kucoin)
 print("API_SECRET_KUCOIN:", api_secret_kucoin)
