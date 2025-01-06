@@ -20,6 +20,13 @@ api_secret_kucoin = os.getenv("API_SECRET_KUCOIN")
 api_passphrase_kucoin = os.getenv("API_PASSPHRASE_KUCOIN")
 
 
+print("API_KEY_KUCOIN:", api_key_kucoin)
+print("API_SECRET_KUCOIN:", api_secret_kucoin)
+print("API_PASSPHRASE_KUCOIN:", api_passphrase_kucoin)
+print("API_KEY_BITGET:", api_key_bitget)
+print("API_SECRET_BITGET:", api_secret_bitget)
+print("API_PASSPHRASE_BITGET:", api_passphrase_bitget)
+
 def get_root_output_dir():
     """
     Gibt den absoluten Pfad zum 'output'-Verzeichnis im Root zurück.
