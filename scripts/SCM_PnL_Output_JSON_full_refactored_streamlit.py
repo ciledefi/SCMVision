@@ -3,6 +3,9 @@ import hmac
 import hashlib
 import base64
 import time
+import sqlite3
+from datetime import date
+from setup_database import insert_or_update_pnl_data  # Import der neuen Funktion
 import json
 import os
 from dotenv import load_dotenv
@@ -59,13 +62,13 @@ def validate_and_fetch_keys():
 api_keys = validate_and_fetch_keys()
 
 # Debugging-Ausgabe (optional)
-if LOCAL_MODE:
-    print("Lokalmodus aktiv: Umgebungsvariablen verwendet.")
-else:
-    print("Cloud-Modus aktiv: Secrets verwendet.")
+# if LOCAL_MODE:
+#     print("Lokalmodus aktiv: Umgebungsvariablen verwendet.")
+# else:
+#     print("Cloud-Modus aktiv: Secrets verwendet.")
 
-for key, value in api_keys.items():
-    print(f"{key}: {value}")
+# for key, value in api_keys.items():
+#     print(f"{key}: {value}")
 
 # Zugriff auf die API-Keys
 api_key_kucoin = api_keys["KUCOIN_KEY"]
@@ -143,6 +146,51 @@ def save_pnl_to_json(exchange, investment, spot_balance, futures_balance, filena
         json.dump(data, f, indent=4)
 
     print(f"PnL-Daten für {exchange} erfolgreich in {filepath} gespeichert.")
+
+def save_pnl_to_database(exchange, spot_balance, futures_balance, total_balance, pnl_percentage):
+    """
+    Speichert PnL-Daten in die SQLite-Datenbank.
+    """
+    db_path = os.getenv("DB_PATH", "pnl_data.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO pnl_data (date, exchange, spot_balance, futures_balance, total_balance, pnl_percentage)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (date.today(), exchange, spot_balance, futures_balance, total_balance, pnl_percentage))
+    
+    conn.commit()
+    conn.close()
+    print(f"PnL-Daten für {exchange} erfolgreich in die Datenbank gespeichert.")
+
+def calculate_and_save_total_pnl(investments, spot_balances, futures_balances):
+    """
+    Berechnet und speichert die Gesamt-PnL (über alle Börsen hinweg).
+    """
+    total_investment = sum(investments.values())
+    total_spot_balance = sum(spot_balances.values())
+    total_futures_balance = sum(futures_balances.values())
+    total_balance = total_spot_balance + total_futures_balance
+    pnl_percentage = ((total_balance - total_investment) / total_investment) * 100
+
+    # In JSON speichern (optional)
+    save_pnl_to_json(
+        "Gesamt", 
+        total_investment, 
+        total_spot_balance, 
+        total_futures_balance, 
+        "gesamt_pnl.json"
+    )
+
+    # In die Datenbank speichern
+    save_pnl_to_database(
+        "Gesamt", 
+        total_spot_balance, 
+        total_futures_balance, 
+        total_balance, 
+        pnl_percentage
+    )
 
 # Funktion: Preise von KuCoin abrufen
 def get_prices_kucoin():
@@ -242,25 +290,57 @@ def get_futures_balance_bitget():
     return total_futures_balance
 
 
-# Hauptlogik
 def generate_pnl_data():
     investments = {
         "KuCoin": float(os.getenv("INVESTMENT_KUCOIN", 0)),
         "Bitget": float(os.getenv("INVESTMENT_BITGET", 0)),
     }
 
-    prices_kucoin = get_prices_kucoin()
-    prices_bitget = get_prices_bitget()
-
-    total_spot_balance_kucoin = get_spot_balance_kucoin(prices_kucoin)
-    total_spot_balance_bitget = get_spot_balance_bitget(prices_bitget)
-
+    # Rufe Spot- und Futures-Bilanzen ab
+    total_spot_balance_kucoin = get_spot_balance_kucoin(get_prices_kucoin())
     total_futures_balance_kucoin = get_futures_balance_kucoin()
+
+    total_spot_balance_bitget = get_spot_balance_bitget(get_prices_bitget())
     total_futures_balance_bitget = get_futures_balance_bitget()
 
+    # KuCoin
     save_pnl_to_json("KuCoin", investments["KuCoin"], total_spot_balance_kucoin, total_futures_balance_kucoin, "kucoin_pnl.json")
+    insert_or_update_pnl_data(date.today(), "KuCoin", total_spot_balance_kucoin, total_futures_balance_kucoin, total_spot_balance_kucoin + total_futures_balance_kucoin, (total_spot_balance_kucoin + total_futures_balance_kucoin - investments["KuCoin"]) / investments["KuCoin"] * 100)
+
+    # Bitget
     save_pnl_to_json("Bitget", investments["Bitget"], total_spot_balance_bitget, total_futures_balance_bitget, "bitget_pnl.json")
+    insert_or_update_pnl_data(date.today(), "Bitget", total_spot_balance_bitget, total_futures_balance_bitget, total_spot_balance_bitget + total_futures_balance_bitget, (total_spot_balance_bitget + total_futures_balance_bitget - investments["Bitget"]) / investments["Bitget"] * 100)
+
+    # Gesamt
+    total_balance = total_spot_balance_kucoin + total_spot_balance_bitget + total_futures_balance_kucoin + total_futures_balance_bitget
+    total_investment = investments["KuCoin"] + investments["Bitget"]
+    total_pnl_percentage = (total_balance - total_investment) / total_investment * 100
+
+    save_pnl_to_json("Gesamt", total_investment, total_spot_balance_kucoin + total_spot_balance_bitget, total_futures_balance_kucoin + total_futures_balance_bitget, "gesamt_pnl.json")
+    insert_or_update_pnl_data(date.today(), "Gesamt", total_spot_balance_kucoin + total_spot_balance_bitget, total_futures_balance_kucoin + total_futures_balance_bitget, total_balance, total_pnl_percentage)
+
     print("PnL-Daten wurden erfolgreich gespeichert.")
+# Hauptlogik
+#def generate_pnl_data():
+#    investments = {
+#        "KuCoin": float(os.getenv("INVESTMENT_KUCOIN", 0)),
+#        "Bitget": float(os.getenv("INVESTMENT_BITGET", 0)),
+#    }
+
+#   prices_kucoin = get_prices_kucoin()
+#   prices_bitget = get_prices_bitget()
+
+#  total_spot_balance_kucoin = get_spot_balance_kucoin(prices_kucoin)
+#    total_spot_balance_bitget = get_spot_balance_bitget(prices_bitget)
+
+#    total_futures_balance_kucoin = get_futures_balance_kucoin()
+#    total_futures_balance_bitget = get_futures_balance_bitget()
+
+#    save_pnl_to_json("KuCoin", investments["KuCoin"], total_spot_balance_kucoin, total_futures_balance_kucoin, "kucoin_pnl.json")
+#    save_pnl_to_database("KuCoin", total_spot_balance_kucoin, total_futures_balance_kucoin, total_spot_balance_kucoin + total_futures_balance_kucoin, (total_spot_balance_kucoin + total_futures_balance_kucoin - investments["KuCoin"]) / investments["KuCoin"] * 100)
+
+#    save_pnl_to_json("Bitget", investments["Bitget"], total_spot_balance_bitget, total_futures_balance_bitget, "bitget_pnl.json")
+#    save_pnl_to_database("Bitget", total_spot_balance_bitget, total_futures_balance_bitget, total_spot_balance_bitget + total_futures_balance_bitget, (total_spot_balance_bitget + total_futures_balance_bitget - investments["Bitget"]) / investments["Bitget"] * 100)
 
 if __name__ == "__main__":
     generate_pnl_data()

@@ -1,105 +1,167 @@
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
-import matplotlib.pyplot as plt
-from datetime import datetime
-import json
+import sqlite3
 import os
-from SCM_PnL_Output_JSON_full_refactored_streamlit import generate_pnl_data, get_root_output_dir  # Importiere die PnL-Funktion
+from dotenv import load_dotenv
+from SCM_PnL_Output_JSON_full_refactored_streamlit import generate_pnl_data, get_root_output_dir
 
+import warnings
 
-# Globale Variable für den Output-Ordner
-output_dir = get_root_output_dir()
+# Unterdrücke spezifische Warnungen
+warnings.filterwarnings("ignore", message="missing ScriptRunContext! This warning can be ignored when running in bare mode")
 
-def load_json(filename):
-    """
-    Lädt eine JSON-Datei aus dem 'output'-Verzeichnis im Root.
-    """
-    filepath = os.path.join(output_dir, filename)
-
-    try:
-        with open(filepath, "r") as f:
-            st.info(f"Lade Datei: {filepath}")  # Debugging
-            return json.load(f)
-    except FileNotFoundError:
-        st.error(f"Datei nicht gefunden: {filepath}")
-        return {}
 
 # Layout für Streamlit Dashboard
 st.set_page_config(layout="wide")
 st.markdown("<h1 style='text-align: center;'>SCM Performance Dashboard</h1>", unsafe_allow_html=True)
 
-# JSON-Daten generieren (Button)
-if st.sidebar.button("PnL-Daten generieren"):
-    st.info("PnL-Daten werden generiert...")
-    print("Generierungs-Button wurde geklickt")  # Debug-Ausgabe
+# Umgebungsvariablen laden
+load_dotenv()
+LOCAL_MODE = os.getenv("LOCAL_MODE", "true").lower() == "true"
+#testetst
+
+# Funktion: Zugriff auf Investment-Werte
+def get_investment(exchange):
+    if LOCAL_MODE:
+        key = f"INVESTMENT_{exchange.upper()}"
+        return float(os.getenv(key, 0))
+    else:
+        key = f"investment.{exchange.lower()}"
+        return float(st.secrets[key])
+
+# Verbindung zur SQLite-Datenbank herstellen
+def fetch_pnl_data():
+    db_path = os.getenv("DB_PATH", "pnl_data.db")
+    if not os.path.exists(db_path):
+        print(f"Datenbank {db_path} wird erstellt...")
+        # Erstellen der Datenbank hier
+    else:
+        print(f"Datenbank {db_path} existiert bereits.")
+    conn = sqlite3.connect(db_path)
+    query = """
+    SELECT date, exchange, spot_balance, futures_balance, total_balance, pnl_percentage
+    FROM pnl_data
+    ORDER BY date ASC;
+    """
+    data = pd.read_sql_query(query, conn)
+    conn.close()
+    return data
+
+# Gauge erstellen
+def create_gauge(value, min_val, max_val, threshold_1, threshold_2):
+    gauge = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=value,
+        title={'text': 'PnL (%)'},
+        delta={'reference': 0},
+        gauge={
+            'axis': {'range': [min_val, max_val]},
+            'bar': {'color': "green"},
+            'steps': [
+                {'range': [min_val, threshold_1], 'color': "red"},
+                {'range': [threshold_1, threshold_2], 'color': "yellow"},
+                {'range': [threshold_2, max_val], 'color': "green"},
+            ],
+        },
+    ))
+    return gauge
+
+# Zeitbereichsauswahl hinzufügen
+zeitbereich = st.radio(
+    "Wähle den Zeitraum für den PnL-Verlauf:",
+    ("Monatlich", "Quartalsweise", "Jährlich"),
+    index=0
+)
+
+# Daten entsprechend des Zeitbereichs anpassen
+def get_time_filtered_data(data, zeitraum):
+    if zeitraum == "Monatlich":
+        start_date = pd.Timestamp.now() - pd.DateOffset(days=30)
+        resample_freq = 'D'
+    elif zeitraum == "Quartalsweise":
+        start_date = pd.Timestamp.now() - pd.DateOffset(weeks=13)
+        resample_freq = 'W'
+    elif zeitraum == "Jährlich":
+        start_date = pd.Timestamp.now() - pd.DateOffset(months=12)
+        resample_freq = 'M'
+
+    # Filter und Gruppierung
+    filtered_data = data[data['date'] >= start_date]
+    grouped_data = filtered_data.groupby(['exchange', pd.Grouper(key='date', freq=resample_freq)]).mean().reset_index()
+    return grouped_data, resample_freq
+
+# PnL-Daten generieren
+try:
     generate_pnl_data()
-    st.success("PnL-Daten erfolgreich generiert!")
-    st.write(f"Dateien wurden im Output-Ordner ({output_dir}) gespeichert.")
+    print("PnL-Daten erfolgreich generiert.")
+except Exception as e:
+    st.error(f"Fehler beim Generieren der PnL-Daten: {e}")
 
-# JSON-Dateien laden
-kucoin_data = load_json("kucoin_pnl.json")
-bitget_data = load_json("bitget_pnl.json")
 
-# Prüfen, ob Daten vorhanden sind
-if kucoin_data and bitget_data:
-    # Gesamtdaten berechnen
-    total_spot = kucoin_data["spot_balance"] + bitget_data["spot_balance"]
-    total_futures = kucoin_data["futures_balance"] + bitget_data["futures_balance"]
-    total_invest = kucoin_data["investment"] + bitget_data["investment"]
-    total_actual = kucoin_data["total_balance"] + bitget_data["total_balance"]
-    total_abs_pnl = total_actual - total_invest
-    total_rel_pnl = (total_abs_pnl / total_invest) * 100
+# Daten aus der Datenbank laden
+pnl_data = fetch_pnl_data()
 
-    # DataFrame aus JSON-Daten erstellen
-    data = {
+# Datumsspalte in datetime konvertieren
+pnl_data['date'] = pd.to_datetime(pnl_data['date'], errors='coerce')
+
+# Überprüfe, ob es ungültige Datumswerte gibt
+if pnl_data['date'].isnull().any():
+    print("Warnung: Ungültige Datumswerte in den Daten!")
+    pnl_data = pnl_data.dropna(subset=['date'])
+
+if not pnl_data.empty:
+    # Letzte Einträge für jede Börse abrufen
+    latest_data = pnl_data.groupby('exchange').last().reset_index()
+
+    # Daten für die Tabelle sicherstellen
+    kucoin_investment = get_investment("KuCoin")
+    bitget_investment = get_investment("Bitget")
+    total_investment = kucoin_investment + bitget_investment
+
+    # Fehlende Einträge prüfen und auffüllen
+    if 'KuCoin' not in latest_data['exchange'].values:
+        latest_data = pd.concat(
+            [latest_data, pd.DataFrame([{'exchange': 'KuCoin', 'spot_balance': 0, 'futures_balance': 0, 'total_balance': 0}])]
+        )
+    if 'Bitget' not in latest_data['exchange'].values:
+        latest_data = pd.concat(
+            [latest_data, pd.DataFrame([{'exchange': 'Bitget', 'spot_balance': 0, 'futures_balance': 0, 'total_balance': 0}])]
+        )
+
+    # Reihenfolge festlegen
+    latest_data = latest_data.set_index('exchange').reindex(['KuCoin', 'Bitget']).reset_index()
+
+    # Berechnung der Gesamtwerte
+    total_spot = latest_data['spot_balance'].sum()
+    total_futures = latest_data['futures_balance'].sum()
+    total_actual = latest_data['total_balance'].sum()
+    total_abs_pnl = total_actual - total_investment
+    total_rel_pnl = (total_abs_pnl / total_investment) * 100
+
+    # DataFrame für die Tabelle erstellen
+    table_data = {
         "Börse": ["KuCoin", "Bitget", "Gesamt"],
-        "Spot": [kucoin_data["spot_balance"], bitget_data["spot_balance"], total_spot],
-        "Futures": [kucoin_data["futures_balance"], bitget_data["futures_balance"], total_futures],
-        "Invest": [kucoin_data["investment"], bitget_data["investment"], total_invest],
-        "Actual": [kucoin_data["total_balance"], bitget_data["total_balance"], total_actual],
+        "Spot": latest_data['spot_balance'].tolist() + [total_spot],
+        "Futures": latest_data['futures_balance'].tolist() + [total_futures],
+        "Invest": [kucoin_investment, bitget_investment, total_investment],
+        "Actual": latest_data['total_balance'].tolist() + [total_actual],
         "Abs PnL": [
-            kucoin_data["total_balance"] - kucoin_data["investment"],
-            bitget_data["total_balance"] - bitget_data["investment"],
+            latest_data.loc[0, 'total_balance'] - kucoin_investment,
+            latest_data.loc[1, 'total_balance'] - bitget_investment,
             total_abs_pnl,
         ],
         "Rel PnL": [
-            ((kucoin_data["total_balance"] - kucoin_data["investment"]) / kucoin_data["investment"]) * 100,
-            ((bitget_data["total_balance"] - bitget_data["investment"]) / bitget_data["investment"]) * 100,
+            ((latest_data.loc[0, 'total_balance'] - kucoin_investment) / kucoin_investment) * 100 if kucoin_investment > 0 else 0,
+            ((latest_data.loc[1, 'total_balance'] - bitget_investment) / bitget_investment) * 100 if bitget_investment > 0 else 0,
             total_rel_pnl,
         ],
     }
-    df = pd.DataFrame(data)
 
-    # Funktion zum Erstellen von Gauges
-    def create_gauge(value, min_val, max_val, threshold_1, threshold_2):
-        gauge = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=value,
-            title={'text': 'PnL (%)'},
-            delta={'reference': 0},
-            gauge={
-                'axis': {'range': [min_val, max_val]},
-                'bar': {'color': "green"},
-                'steps': [
-                    {'range': [min_val, threshold_1], 'color': "red"},
-                    {'range': [threshold_1, threshold_2], 'color': "yellow"},
-                    {'range': [threshold_2, max_val], 'color': "green"},
-                ],
-                'threshold': {
-                    'line': {'color': "black", 'width': 4},
-                    'thickness': 0.75,
-                    'value': value,
-                },
-            },
-        ))
-        return gauge
-
-    # Aktuelle PnL Werte Tabelle
-    st.subheader("Aktuelle PnL Werte:")
+    df = pd.DataFrame(table_data)
     st.dataframe(df, use_container_width=True)
 
-    # Performance Gauges
+    # Gauges anzeigen
     st.subheader("Performance/Profit")
     col1, col2, col3 = st.columns(3)
 
@@ -118,19 +180,38 @@ if kucoin_data and bitget_data:
         st.write("Gesamt Performance:")
         st.plotly_chart(gauge_total, use_container_width=True)
 
-    # PnL Verlauf über Wochen (Dummy-Daten)
-    st.subheader("PnL Verlauf über Wochen")
-    dates = [datetime.today() - pd.DateOffset(weeks=i) for i in range(7)]
-    pnl_values = [23500, 23600, 23450, 23700, 23650, 23750, 23800]
+    # Verlaufsgrafik erstellen
+    filtered_data, freq = get_time_filtered_data(pnl_data, zeitbereich)
 
-    plt.figure(figsize=(15, 5))
-    plt.plot(dates, pnl_values, marker='o', label='Actual PnL', color='orange')
-    plt.title("PnL Verlauf über Wochen")
-    plt.xlabel("Datum")
-    plt.ylabel("Wert in USDT")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    st.pyplot(plt)
+    st.subheader(f"PnL Verlauf ({zeitbereich})")
+    fig = go.Figure()
+
+    for exchange in ["KuCoin", "Bitget", "Gesamt"]:
+        exchange_data = filtered_data[filtered_data['exchange'] == exchange]
+        fig.add_trace(go.Scatter(
+            x=exchange_data['date'],
+            y=exchange_data['pnl_percentage'],
+            mode='lines+markers',
+            name=f"{exchange} PnL (%)"
+        ))
+
+    fig.update_layout(
+        title="PnL Verlauf über den Zeitraum",
+        xaxis_title="Datum",
+        yaxis_title="PnL (%)",
+        xaxis=dict(tickformat="%b %d" if freq == 'D' else "%b" if freq == 'M' else "%d.%m.%Y"),
+        height=500
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 else:
     st.warning("Keine PnL-Daten verfügbar. Bitte generieren Sie die Daten zuerst.")
+
+if st.sidebar.button("PnL-Daten generieren"):
+    try:
+        generate_pnl_data()
+        st.success("PnL-Daten erfolgreich generiert!")
+        st.session_state["reload"] = True  # Markiere die Seite zur Aktualisierung
+    except Exception as e:
+        st.error(f"Fehler beim Generieren der PnL-Daten: {e}")
