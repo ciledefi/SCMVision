@@ -25,3 +25,7 @@ env/
 # Betriebssystem-spezifische Dateien
 .DS_Store
 Thumbs.db
+
+*.db
+*.json
+output/
