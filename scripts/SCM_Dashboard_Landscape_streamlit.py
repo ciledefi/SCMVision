@@ -5,6 +5,7 @@ import sqlite3
 import os
 from dotenv import load_dotenv
 from SCM_PnL_Output_JSON_full_refactored_streamlit import generate_pnl_data, get_root_output_dir
+from gauge_utils import create_gauge  # Importiere die ausgelagerte Funktion
 
 import warnings
 
@@ -19,7 +20,6 @@ st.markdown("<h1 style='text-align: center;'>SCM Performance Dashboard</h1>", un
 # Umgebungsvariablen laden
 load_dotenv()
 LOCAL_MODE = os.getenv("LOCAL_MODE", "true").lower() == "true"
-#testetst
 
 # Funktion: Zugriff auf Investment-Werte
 def get_investment(exchange):
@@ -47,25 +47,6 @@ def fetch_pnl_data():
     data = pd.read_sql_query(query, conn)
     conn.close()
     return data
-
-# Gauge erstellen
-def create_gauge(value, min_val, max_val, threshold_1, threshold_2):
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=value,
-        title={'text': 'PnL (%)'},
-        delta={'reference': 0},
-        gauge={
-            'axis': {'range': [min_val, max_val]},
-            'bar': {'color': "green"},
-            'steps': [
-                {'range': [min_val, threshold_1], 'color': "red"},
-                {'range': [threshold_1, threshold_2], 'color': "yellow"},
-                {'range': [threshold_2, max_val], 'color': "green"},
-            ],
-        },
-    ))
-    return gauge
 
 # Zeitbereichsauswahl hinzufügen
 zeitbereich = st.radio(
@@ -161,22 +142,25 @@ if not pnl_data.empty:
     df = pd.DataFrame(table_data)
     st.dataframe(df, use_container_width=True)
 
+    # Farben für die Gauges
+    colors = ["#7E57C2", "#9575CD", "#B39DDB", "#D3D3D3"]  # Lila-Töne + Grau
+
     # Gauges anzeigen
     st.subheader("Performance/Profit")
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        gauge_kucoin = create_gauge(df.loc[0, 'Rel PnL'], -25, 25, 2, 15)
+        gauge_kucoin = create_gauge(df.loc[0, 'Rel PnL'], -25, 25, 2, 15, colors)
         st.write("KuCoin Performance:")
         st.plotly_chart(gauge_kucoin, use_container_width=True)
 
     with col2:
-        gauge_bitget = create_gauge(df.loc[1, 'Rel PnL'], -25, 25, 2, 15)
+        gauge_bitget = create_gauge(df.loc[1, 'Rel PnL'], -25, 25, 2, 15, colors)
         st.write("Bitget Performance:")
         st.plotly_chart(gauge_bitget, use_container_width=True)
 
     with col3:
-        gauge_total = create_gauge(df.loc[2, 'Rel PnL'], -25, 25, 2, 15)
+        gauge_total = create_gauge(df.loc[2, 'Rel PnL'], -25, 25, 2, 15, colors)
         st.write("Gesamt Performance:")
         st.plotly_chart(gauge_total, use_container_width=True)
 
