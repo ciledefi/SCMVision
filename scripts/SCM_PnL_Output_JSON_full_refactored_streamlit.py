@@ -62,13 +62,13 @@ def validate_and_fetch_keys():
 api_keys = validate_and_fetch_keys()
 
 # Debugging-Ausgabe (optional)
-# if LOCAL_MODE:
-#     print("Lokalmodus aktiv: Umgebungsvariablen verwendet.")
-# else:
-#     print("Cloud-Modus aktiv: Secrets verwendet.")
+if LOCAL_MODE:
+    print("Lokalmodus aktiv: Umgebungsvariablen verwendet.")
+else:
+    print("Cloud-Modus aktiv: Secrets verwendet.")
 
-# for key, value in api_keys.items():
-#     print(f"{key}: {value}")
+for key, value in api_keys.items():
+    print(f"{key}: {value}")
 
 # Zugriff auf die API-Keys
 api_key_kucoin = api_keys["KUCOIN_KEY"]
