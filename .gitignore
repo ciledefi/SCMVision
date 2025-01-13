@@ -29,3 +29,6 @@ Thumbs.db
 *.db
 *.json
 output/
+
+secrets.toml
+
