@@ -1,20 +1,29 @@
-import subprocess
 import os
 from datetime import datetime
+import subprocess
 
 def backup_to_github():
     """
     Funktion zum Sichern der Datenbank in ein GitHub-Repository.
     """
-    # Pfade definieren
-    db_path = "pnl_data.db"  # Pfad zur Datenbank
-    repo_path = "/app"  # Pfad zum GitHub-Repository auf Streamlit Cloud
-    os.chdir(repo_path)  # Zum Repository wechseln
+    # Verzeichnispfade
+    repo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # Root-Verzeichnis
+    db_path = os.path.join(repo_path, "pnl_data.db")  # Absoluter Pfad zur Datenbank
+
+    # Prüfe, ob die Datenbank existiert
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Datenbank nicht gefunden: {db_path}")
+
+    # Zum Git-Repository wechseln
+    os.chdir(repo_path)
 
     # Backup-Dateiname mit Zeitstempel
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_filename = f"pnl_data_backup_{timestamp}.db"
-    os.system(f"cp {db_path} {repo_path}/{backup_filename}")
+    backup_path = os.path.join(repo_path, backup_filename)
+
+    # Datenbank kopieren
+    os.system(f"cp {db_path} {backup_path}")
 
     # Git-Befehle ausführen
     try:
