@@ -3,31 +3,26 @@ from datetime import datetime
 import subprocess
 
 def backup_to_github():
-    """
-    Funktion zum Sichern der Datenbank in ein GitHub-Repository.
-    """
-    # Pfade definieren
-    db_path = "../pnl_data.db"  # Relativer Pfad zur Datenbank
+    # Repository-Root-Verzeichnis
     repo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    os.chdir(repo_path)  # Zum Repository wechseln
+    os.chdir(repo_path)  # Wechsle ins Repository-Verzeichnis
+
+    # Absoluter Pfad zur Datenbank
+    db_path = os.path.join(repo_path, "pnl_data.db")
+
+    # Überprüfe, ob die Datenbank existiert
+    if not os.path.exists(db_path):
+        print(f"Fehler: Datenbankdatei {db_path} wurde nicht gefunden.")
+        return
 
     # Backup-Dateiname mit Zeitstempel
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_filename = f"pnl_data_backup_{timestamp}.db"
     backup_path = os.path.join(repo_path, backup_filename)
 
-    # Überprüfen, ob die Datenbank existiert
-    if not os.path.exists(db_path):
-        print(f"Fehler: Datenbankdatei {db_path} wurde nicht gefunden.")
-        return
-
-    # Kopiere die Datei
-    try:
-        os.system(f"cp {db_path} {backup_path}")
-        print(f"Backup erfolgreich erstellt: {backup_path}")
-    except Exception as e:
-        print(f"Fehler beim Erstellen des Backups: {e}")
-        return
+    # Backup erstellen
+    os.system(f"cp {db_path} {backup_path}")
+    print(f"Backup erfolgreich erstellt: {backup_path}")
 
     # Git-Befehle ausführen
     try:
