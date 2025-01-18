@@ -1,32 +1,35 @@
 import os
 import subprocess
 from datetime import datetime
+import streamlit as st  # Nur für Streamlit-Umgebungen erforderlich
 
-def configure_git():
+def configure_git_with_pat():
     """
-    Konfiguriert Git-Benutzerdaten für die Streamlit-Cloud-Umgebung.
+    Konfiguriert die Git-Remote-URL mit dem in Streamlit-Secrets gespeicherten PAT.
     """
-    subprocess.run(["git", "config", "--global", "user.name", "ciledefi"], check=True)
-    subprocess.run(["git", "config", "--global", "user.email", "ciledefi@proton.me"], check=True)
+    pat = st.secrets.get("GITHUB_PAT", "")
+    username = st.secrets.get("GITHUB_USERNAME", "")
+    
+    if not pat or not username:
+        raise ValueError("GITHUB_PAT oder GITHUB_USERNAME fehlen in den Streamlit-Secrets.")
+    
+    repo_url = f"https://{username}:{pat}@github.com/{username}/SCMVision.git"
+    subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
 
 def backup_to_github():
     """
-    Funktion zum Sichern der Datenbank in ein GitHub-Repository.
+    Führt ein Backup der SQLite-Datenbank durch und pusht die Änderungen auf GitHub.
     """
     # Git konfigurieren
-    configure_git()
+    configure_git_with_pat()
 
-    # Repository-Root-Verzeichnis
-    repo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    os.chdir(repo_path)  # Ins Repository wechseln
-
-    # Datenbank-Pfad
+    # Pfade definieren
+    repo_path = "/app"  # Verzeichnis, in dem die App läuft
     db_path = os.path.join(repo_path, "pnl_data.db")
-
-    # Überprüfen, ob die Datenbank existiert
     if not os.path.exists(db_path):
-        print(f"Fehler: Datenbank {db_path} nicht gefunden.")
-        return
+        raise FileNotFoundError(f"Datenbank {db_path} wurde nicht gefunden.")
+    
+    os.chdir(repo_path)
 
     # Backup-Dateiname mit Zeitstempel
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -36,9 +39,6 @@ def backup_to_github():
     # Backup erstellen
     try:
         os.system(f"cp {db_path} {backup_path}")
-        print(f"Backup erfolgreich erstellt: {backup_path}")
-
-        # Git-Befehle ausführen
         subprocess.run(["git", "add", backup_filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Backup der Datenbank am {timestamp}"], check=True)
         subprocess.run(["git", "push"], check=True)
