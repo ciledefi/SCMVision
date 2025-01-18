@@ -16,30 +16,34 @@ def backup_to_github():
     # Git konfigurieren
     configure_git()
 
-    # GitHub PAT aus den Secrets abrufen
-    github_pat = os.getenv("GITHUB_PAT")
-    if not github_pat:
-        raise ValueError("GitHub PAT fehlt in den Secrets!")
+    # Repository-Root-Verzeichnis
+    repo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    os.chdir(repo_path)  # Ins Repository wechseln
 
-    # Git-Remote mit PAT konfigurieren
-    repo_url = f"https://{github_pat}@github.com/ciledefi/SCMVision.git"
-    subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
+    # Datenbank-Pfad
+    db_path = os.path.join(repo_path, "pnl_data.db")
 
-    # Backup erstellen und hochladen
-    db_path = "pnl_data.db"
-    repo_path = "/app"
-    os.chdir(repo_path)
+    # Überprüfen, ob die Datenbank existiert
+    if not os.path.exists(db_path):
+        print(f"Fehler: Datenbank {db_path} nicht gefunden.")
+        return
 
+    # Backup-Dateiname mit Zeitstempel
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_filename = f"pnl_data_backup_{timestamp}.db"
     backup_path = os.path.join(repo_path, backup_filename)
 
+    # Backup erstellen
     try:
-        # Backup erstellen
         os.system(f"cp {db_path} {backup_path}")
+        print(f"Backup erfolgreich erstellt: {backup_path}")
+
+        # Git-Befehle ausführen
         subprocess.run(["git", "add", backup_filename], check=True)
         subprocess.run(["git", "commit", "-m", f"Backup der Datenbank am {timestamp}"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Datenbank erfolgreich gesichert und hochgeladen.")
     except subprocess.CalledProcessError as e:
         print(f"Fehler beim Sichern der Datenbank: {e}")
+    except Exception as e:
+        print(f"Ein Fehler ist aufgetreten: {e}")
