@@ -27,6 +27,7 @@ env/
 Thumbs.db
 
 *.db
+!pnl_data_backup_*.db
 *.json
 output/
 
