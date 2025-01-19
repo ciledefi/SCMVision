@@ -33,6 +33,7 @@ def get_investment(exchange):
 # Verbindung zur SQLite-Datenbank herstellen
 def fetch_pnl_data():
     db_path = os.getenv("DB_PATH", "pnl_data.db")
+    print(f"Der Wert von DB_PATH ist: {db_path}")  
     if not os.path.exists(db_path):
         print(f"Datenbank {db_path} wird erstellt...")
         # Erstellen der Datenbank hier
