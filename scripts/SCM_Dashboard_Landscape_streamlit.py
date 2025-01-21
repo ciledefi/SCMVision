@@ -13,6 +13,19 @@ import warnings
 warnings.filterwarnings("ignore", message="missing ScriptRunContext! This warning can be ignored when running in bare mode")
 
 
+def download_database():
+    """
+    Lädt den Inhalt der SQLite-Datenbank in einen Byte-Stream,
+    der heruntergeladen werden kann.
+    """
+    db_path = os.getenv("DB_PATH", "pnl_data.db")  # Datenbankpfad aus Umgebungsvariablen oder Standardwert
+    if os.path.exists(db_path):
+        with open(db_path, "rb") as db_file:
+            return db_file.read()  # Byte-Stream zurückgeben
+    else:
+        st.error(f"Datenbank {db_path} wurde nicht gefunden.")
+        return None
+
 # Layout für Streamlit Dashboard
 st.set_page_config(layout="wide")
 st.markdown("<h1 style='text-align: center;'>SCM Performance Dashboard</h1>", unsafe_allow_html=True)
@@ -193,7 +206,23 @@ if not pnl_data.empty:
 else:
     st.warning("Keine PnL-Daten verfügbar. Bitte generieren Sie die Daten zuerst.")
 
-if st.sidebar.button("PnL-Daten generieren"):
+# Button für Datenbank-Download
+if st.button("Datenbank herunterladen", key="download_button"):
+    db_content = download_database()
+    if db_content:
+        st.download_button(
+            label="Datenbank herunterladen",
+            data=db_content,
+            file_name="pnl_data_backup.db",
+            mime="application/octet-stream",
+            key="download_file_button"
+        )
+    else:
+        st.error("Die Datenbankdatei konnte nicht gefunden werden.")
+
+        
+# Button für PnL-Daten generieren
+if st.sidebar.button("PnL-Daten generieren", key="generate_pnl_button"):
     try:
         generate_pnl_data()
         st.success("PnL-Daten erfolgreich generiert!")
