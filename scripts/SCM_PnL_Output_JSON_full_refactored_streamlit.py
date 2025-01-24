@@ -67,8 +67,8 @@ if LOCAL_MODE:
 else:
     print("Cloud-Modus aktiv: Secrets verwendet.")
 
-#for key, value in api_keys.items():
-#    print(f"{key}: {value}")
+for key, value in api_keys.items():
+    print(f"{key}: {value}")
 
 # Zugriff auf die API-Keys
 api_key_kucoin = api_keys["KUCOIN_KEY"]
